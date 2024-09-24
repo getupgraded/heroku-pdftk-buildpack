@@ -1,4 +1,4 @@
-Heroku buildpack that will install pdftk into /app/bin on Heroku. Supports **heroku-22**.
+Heroku buildpack that will install pdftk into /app/bin on Heroku. Supports **heroku-24**.
 
 ## How to use
 

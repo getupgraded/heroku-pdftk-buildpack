@@ -2,14 +2,43 @@
 
 set -e
 
-mkdir -p "$1/bin/"
-cp -a binaries-$STACK/* "$1/bin/"
-show_version=$(LD_LIBRARY_PATH=$1/bin $1/bin/pdftk --version 2>&1 | tr '\n' ' ' )
+BUILD_DIR=$1
+CACHE_DIR=$2
+ENV_DIR=$3
+
+# Load stack information
+if [ -f "$ENV_DIR/STACK" ]; then
+  STACK=$(cat "$ENV_DIR/STACK")
+else
+  echo "STACK environment variable not set. Using 'heroku-20' as default."
+  STACK="heroku-20"
+fi
+
+echo "-----> Installing pdftk for $STACK"
+
+# Check if we have a cached version
+if [ -f "$CACHE_DIR/pdftk-$STACK.tar.gz" ]; then
+  echo "-----> Using cached pdftk binaries"
+  tar xzf "$CACHE_DIR/pdftk-$STACK.tar.gz" -C "$BUILD_DIR"
+else
+  echo "-----> Compiling pdftk"
+  "$BUILD_DIR/scripts/build.sh" "$BUILD_DIR" "$CACHE_DIR"
+  
+  # After building, package the binaries
+  tar czf "$CACHE_DIR/pdftk-$STACK.tar.gz" -C "$BUILD_DIR" binaries-$STACK
+fi
+
+# Copy binaries to the appropriate location
+mkdir -p "$BUILD_DIR/bin/"
+cp -a "$BUILD_DIR/binaries-$STACK"/* "$BUILD_DIR/bin/"
+
+# Verify installation
+show_version=$(LD_LIBRARY_PATH=$BUILD_DIR/bin $BUILD_DIR/bin/pdftk --version 2>&1 | tr '\n' ' ' )
 echo "-----> heroku-pdftk-buildpack: Installed to app/bin. ${show_version}"
 
-# Setting environment variables in .profile.d script (sourced at dyno startup)
-mkdir -p "$1/.profile.d/"
-cat <<EOF >"$1"/.profile.d/pdftk.sh
+# Set up environment for runtime
+mkdir -p "$BUILD_DIR/.profile.d/"
+cat <<EOF >"$BUILD_DIR"/.profile.d/pdftk.sh
 export LD_LIBRARY_PATH="\$LD_LIBRARY_PATH:\$HOME/bin"
 EOF
 
